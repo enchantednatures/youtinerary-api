@@ -42,22 +42,30 @@ async fn hello_world() -> &'static str {
 
 #[tracing::instrument(name = "Get Itinerary", skip(db))]
 pub async fn get_itinerary(State(db): State<PgPool>, Path(id): Path<i32>) -> impl IntoResponse {
-    "get_itinerary"
+    (StatusCode::OK, "get_itinerary")
 }
 
-pub async fn create_itinerary() -> impl IntoResponse {
-    "create_itinerary"
+#[tracing::instrument(name = "Create Itinerary", skip(db, create_itinerary))]
+pub async fn create_itinerary(
+    State(db): State<PgPool>,
+    Json(create_itinerary): Json<CreateItineraryRequest>,
+) -> impl IntoResponse {
+    (StatusCode::CREATED, Json(create_itinerary))
 }
 
-pub async fn put_itinerary(Path(id): Path<i32>) -> impl IntoResponse {
-    "put_itinerary"
-}
-pub async fn get_itineraries() -> impl IntoResponse {
-    "get_itineraries"
+#[tracing::instrument(name = "Put Itinerary", skip(db))]
+pub async fn put_itinerary(State(db): State<PgPool>, Path(id): Path<i32>) -> impl IntoResponse {
+    (StatusCode::NOT_IMPLEMENTED, "put_itinerary")
 }
 
-pub async fn delete_itinerary(Path(id): Path<i32>) -> impl IntoResponse {
-    "delete_itinerary"
+#[tracing::instrument(name = "Get Itineraries", skip(db))]
+pub async fn get_itineraries(State(db): State<PgPool>) -> impl IntoResponse {
+    (StatusCode::NOT_IMPLEMENTED, "get_itineraries")
+}
+
+#[tracing::instrument(name = "Get Itineraries", skip(db))]
+pub async fn delete_itinerary(State(db): State<PgPool>, Path(id): Path<i32>) -> impl IntoResponse {
+    (StatusCode::NOT_IMPLEMENTED, "delete_itinerary")
 }
 
 pub fn itineraries_router() -> Router<AppState> {
