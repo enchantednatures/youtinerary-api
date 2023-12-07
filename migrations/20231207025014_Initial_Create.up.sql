@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users
             unique,
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
-)
+);
 
 create table if not exists itineraries
 (
