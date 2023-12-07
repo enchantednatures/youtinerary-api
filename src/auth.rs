@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 
-
 use axum::extract::{Query, State};
 use axum::headers::HeaderMap;
 use axum::http::header::SET_COOKIE;
@@ -58,6 +57,6 @@ where
             })?;
         let session_cookie = cookies.get(COOKIE_NAME).ok_or(AuthRedirect)?;
 
-        Ok(User { id: 0})
+        Ok(User { id: 0 })
     }
 }

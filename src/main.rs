@@ -41,9 +41,7 @@ async fn hello_world() -> &'static str {
 }
 
 #[tracing::instrument(name = "Get Itinerary", skip(db))]
-pub async fn get_itinerary(
-    State(db): State<PgPool>,
-    Path(id): Path<i32>) -> impl IntoResponse {
+pub async fn get_itinerary(State(db): State<PgPool>, Path(id): Path<i32>) -> impl IntoResponse {
     "get_itinerary"
 }
 
