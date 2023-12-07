@@ -79,7 +79,7 @@ create table if not exists stays
 create table if not exists activities
 (
     id         serial                                 not null
-        constraint stay_pk
+        constraint activities_pk
             primary key,
     summary    varchar(255)                           not null,
     start_date timestamp with time zone default now() not null,
