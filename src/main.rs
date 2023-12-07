@@ -6,7 +6,6 @@ async fn hello_world() -> &'static str {
     "Hello, world!"
 }
 
-
 #[derive(Clone)]
 struct MyState {
     pool: PgPool,
@@ -21,8 +20,8 @@ async fn main(#[shuttle_shared_db::Postgres] pool: PgPool) -> shuttle_axum::Shut
 
     let state = MyState { pool };
     let router = Router::new()
-        // .route("/todos", post(add))
-        // .route("/todos/:id", get(retrieve))
+        .route("/", get(hello_world))
+        // .route("", get(retrieve))
         .with_state(state);
 
     Ok(router.into())
