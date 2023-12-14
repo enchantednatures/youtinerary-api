@@ -1,15 +1,12 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
-use axum::extract::{Query, State};
-use axum::headers::HeaderMap;
-use axum::http::header::SET_COOKIE;
 use axum::response::{IntoResponse, Redirect, Response};
 
 use axum::http::header;
 use axum::http::request::Parts;
 use axum::{
     async_trait,
-    extract::{rejection::TypedHeaderRejectionReason, FromRef, FromRequestParts, TypedHeader},
+    extract::{rejection::TypedHeaderRejectionReason, FromRequestParts, TypedHeader},
     headers, RequestPartsExt,
 };
 use serde::Deserialize;

@@ -1,83 +1,17 @@
 mod auth;
+mod db;
 
-use axum::{
-    extract::{FromRef, Path, State},
-    response::IntoResponse,
-    routing::get,
-    Router,
-};
+use axum::{routing::get, Router};
 use serde::{Deserialize, Serialize};
 use shuttle_runtime::CustomError;
 use sqlx::{types::chrono::NaiveDate, PgPool};
 
-use axum::http::StatusCode;
-use axum::Json;
+pub use health_check::*;
 
-#[derive(Serialize, Deserialize)]
-pub enum HealthStatusEnum {
-    Ok,
-    Error,
-}
+mod health_check;
 
-#[derive(Deserialize, Serialize)]
-pub struct HealthStatus {
-    status: HealthStatusEnum,
-}
-
-impl HealthStatus {
-    pub(crate) fn new() -> Self {
-        HealthStatus {
-            status: HealthStatusEnum::Ok,
-        }
-    }
-}
-
-pub async fn health_check() -> impl IntoResponse {
-    (StatusCode::OK, Json(HealthStatus::new()))
-}
-
-async fn hello_world() -> &'static str {
-    "Hello, world!"
-}
-
-#[tracing::instrument(name = "Get Itinerary", skip(db))]
-pub async fn get_itinerary(State(db): State<PgPool>, Path(id): Path<i32>) -> impl IntoResponse {
-    (StatusCode::OK, "get_itinerary")
-}
-
-#[tracing::instrument(name = "Create Itinerary", skip(db, create_itinerary))]
-pub async fn create_itinerary(
-    State(db): State<PgPool>,
-    Json(create_itinerary): Json<CreateItineraryRequest>,
-) -> impl IntoResponse {
-    (StatusCode::CREATED, Json(create_itinerary))
-}
-
-#[tracing::instrument(name = "Put Itinerary", skip(db))]
-pub async fn put_itinerary(State(db): State<PgPool>, Path(id): Path<i32>) -> impl IntoResponse {
-    (StatusCode::NOT_IMPLEMENTED, "put_itinerary")
-}
-
-#[tracing::instrument(name = "Get Itineraries", skip(db))]
-pub async fn get_itineraries(State(db): State<PgPool>) -> impl IntoResponse {
-    (StatusCode::NOT_IMPLEMENTED, "get_itineraries")
-}
-
-#[tracing::instrument(name = "Get Itineraries", skip(db))]
-pub async fn delete_itinerary(State(db): State<PgPool>, Path(id): Path<i32>) -> impl IntoResponse {
-    (StatusCode::NOT_IMPLEMENTED, "delete_itinerary")
-}
-
-pub fn itineraries_router() -> Router<AppState> {
-    Router::new()
-        .route("/itineraries", get(get_itineraries).post(create_itinerary))
-        .route(
-            "/itineraries/:id",
-            get(get_itinerary)
-                .delete(delete_itinerary)
-                .put(put_itinerary),
-        )
-}
+mod routes;
+pub use routes::itineraries_router;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -129,11 +63,8 @@ mod database {
     }
 }
 
-impl FromRef<AppState> for PgPool {
-    fn from_ref(state: &AppState) -> Self {
-        state.pool.clone()
-    }
-}
+// #[async_trait::async_trait]
+// impl ItineraryRepository for PgPool {}
 
 #[shuttle_runtime::main]
 async fn main(#[shuttle_shared_db::Postgres] pool: PgPool) -> shuttle_axum::ShuttleAxum {
@@ -144,7 +75,7 @@ async fn main(#[shuttle_shared_db::Postgres] pool: PgPool) -> shuttle_axum::Shut
 
     let state = AppState { pool };
     let router = Router::new()
-        .route("/", get(hello_world))
+        .route("/", get(health_check))
         .route("/health_check", get(health_check))
         .nest("/api/v0", itineraries_router())
         // .route("", get(retrieve))
