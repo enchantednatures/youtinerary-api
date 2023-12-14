@@ -1,10 +1,10 @@
 use axum::extract::FromRef;
+use chrono::NaiveDate;
 use shuttle_runtime::CustomError;
 use sqlx::PgPool;
-use chrono::NaiveDate;
 
-use crate::AppState;
 use crate::database::Itinerary;
+use crate::AppState;
 
 #[async_trait::async_trait]
 pub trait ItineraryRepository {
