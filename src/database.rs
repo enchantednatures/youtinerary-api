@@ -39,30 +39,30 @@ pub trait CreateStayRepository {
         name: &str,
         description: &str,
         user_id: i32,
-        location: &str,
+        point: (f64, f64),
         start_date: NaiveDate,
         end_date: NaiveDate,
     ) -> Result<Stay, CustomError>;
 }
 
-#[async_trait::async_trait]
-impl CreateStayRepository for PgPool {
-    async fn create_stay(
-        &self,
-        name: &str,
-        description: &str,
-        user_id: i32,
-        location: &str,
-        start_date: NaiveDate,
-        end_date: NaiveDate,
-    ) -> Result<Stay, CustomError> {
-        // todo!()
-        let created_stay = query_as!(
-            Stay,
-            r#"INSERT INTO stays(summary , start_date , end_date , location , notes )
-            VALUES ( $1 , $2 , $3 , $4 , $5 )
-            "#,
-            description, start_date, end_date, location, name
-        );
-    }
-}
+// #[async_trait::async_trait]
+// impl CreateStayRepository for PgPool {
+//     async fn create_stay(
+//         &self,
+//         name: &str,
+//         description: &str,
+//         user_id: i32,
+//         point: (f64, f64),
+//         start_date: NaiveDate,
+//         end_date: NaiveDate,
+//     ) -> Result<Stay, CustomError> {
+//         // todo!()
+//         let created_stay = query_as!(
+//             Stay,
+//             r#"INSERT INTO stays(summary , start_date , end_date , point , notes )
+//             VALUES ( $1 , $2 , $3 , $4 , $5 )
+//             "#,
+//             description, start_date, end_date, location, name
+//         );
+//     }
+// }
