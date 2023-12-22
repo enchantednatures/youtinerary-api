@@ -1,44 +1,76 @@
 -- Add up migration script here
-
 create type itinerary_status as enum ('draft', 'published', 'archived');
 create type itinerary_share_type as enum ('editor', 'viewer');
-create type travel_leg_type as enum ('flight', 'train', 'bus', 'car', 'ferry', 'other');
--- create type 
+create type travel_leg_type as enum (
+    'flight', 'train', 'bus', 'car', 'ferry', 'other'
+    );
 
-CREATE TABLE IF NOT EXISTS users
+-- create type 
+create table users
 (
-    id         serial                                 not null
+    user_id    serial                  not null
         constraint users_pk primary key,
-    name       varchar(255)                           not null,
-    email      varchar(255)                           not null
-        constraint users_email_unique
-            unique,
-    created_at timestamp with time zone default now() not null,
-    updated_at timestamp with time zone default now() not null
+    name       varchar(255)            not null,
+    created_at timestamp default now() not null,
+    updated_at timestamp default now() not null
+);
+create table user_email
+(
+    user_id integer      not null
+        constraint user_email_users_id_fk
+            references users
+            on update cascade
+            on delete cascade,
+    email   varchar(255) not null
+        constraint user_email_email_unique
+            unique
 );
 
-create table if not exists itineraries
+create table user_password
 (
-    id         serial                                 not null
+    user_id  integer      not null
+        constraint user_password_users_id_fk
+            references users
+            on update cascade
+            on delete cascade,
+    password varchar(255) not null
+);
+
+create table itineraries
+(
+    itinerary_id serial                  not null
         constraint itineraries_pk
             primary key,
-    name       varchar(255)                           not null,
-    user_id    integer                                not null
+    user_id      integer                 not null
         constraint itineraries_users_id_fk
             references users
             on update cascade on delete cascade,
-    created_at timestamp with time zone default now() not null,
-    updated_at timestamp with time zone default now() not null,
-    start_date date                                   not null,
-    end_date   date                                   not null
+    name         varchar(255)            not null,
+    created_at   timestamp default now() not null,
+    updated_at   timestamp default now() not null
+);
+
+create table itinerary_start_date
+(
+    itinerary_id integer not null
+        constraint itinerary_start_date_itineraries_id_fk
+            references itineraries
+            on update cascade on delete cascade,
+    start_date   date    not null
+);
+
+create table itinerary_end_date
+(
+    itinerary_id integer not null
+        constraint itinerary_end_date_itineraries_id_fk
+            references itineraries
+            on update cascade on delete cascade,
+    end_date     date    not null
 );
 
 
-create table if not exists itinerary_shares
+create table itinerary_shares
 (
-    id            serial               not null
-        constraint itinerary_shares_pk
-            primary key,
     itinerary_id  integer              not null
         constraint itinerary_shares_itineraries_id_fk
             references itineraries
@@ -52,7 +84,7 @@ create table if not exists itinerary_shares
 );
 
 
-create table if not exists itinerary_items
+create table itinerary_items
 (
     id           serial       not null
         constraint itinerary_items_pk
@@ -64,43 +96,43 @@ create table if not exists itinerary_items
     name         varchar(255) not null
 );
 
-create table if not exists stays
+create table stays
 (
-    id         serial                                 not null
+    id         serial       not null
         constraint stay_pk
             primary key,
-    summary    varchar(255)                           not null,
-    start_date timestamp with time zone default now() not null,
-    end_date   timestamp with time zone default now() not null,
-    location   varchar(255)                           not null,
-    notes      varchar(255)                           not null
+    summary    varchar(255) not null,
+    start_date date         not null,
+    end_date   date         not null,
+    location   point        not null,
+    notes      varchar(255) not null
 );
 
-create table if not exists activities
+create table activities
 (
-    id         serial                                 not null
+    id         serial       not null
         constraint activities_pk
             primary key,
-    summary    varchar(255)                           not null,
-    start_date timestamp with time zone default now() not null,
-    end_date   timestamp with time zone default now() not null,
-    location   varchar(255)                           not null,
-    notes      varchar(255)                           not null
+    summary    varchar(255) not null,
+    start_date date         not null,
+    end_date   date         not null,
+    location   point        not null,
+    notes      varchar(255) not null
 );
 
-create table if not exists travel_legs
+create table travel_legs
 (
-    id                serial                                 not null
+    id                serial          not null
         constraint travel_legs_pk
             primary key,
-    itinerary_item_id integer                                not null
+    itinerary_item_id integer         not null
         constraint travel_legs_itinerary_items_id_fk
             references itinerary_items
             on update cascade on delete cascade,
-    travel_leg_type   travel_leg_type                        not null,
-    start_date        timestamp with time zone default now() not null,
-    end_date          timestamp with time zone default now() not null,
-    start_location    varchar(255)                           not null,
-    end_location      varchar(255)                           not null,
-    notes             varchar(255)                           not null
+    travel_leg_type   travel_leg_type not null,
+    start_date        date            not null,
+    end_date          date            not null,
+    start_location    point           not null,
+    end_location      point           not null,
+    notes             varchar(255)    not null
 );
