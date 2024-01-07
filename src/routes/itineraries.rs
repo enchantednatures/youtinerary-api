@@ -3,11 +3,13 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
+use axum::routing::post;
 use axum::{routing::get, Router};
 use serde::{Deserialize, Serialize};
 use sqlx::{types::chrono::NaiveDate, PgPool};
 
 use crate::AppState;
+use crate::features::create_flight;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateItineraryRequest {
@@ -78,6 +80,7 @@ pub fn itineraries_router() -> Router<AppState> {
     Router::new()
         .route("/itineraries", get(get_itineraries).post(create_itinerary))
         .route("/itineraries/:id", get(get_itinerary).put(put_itinerary))
+        .route("/itineraries/:id/flights", post(create_flight))
         .route(
             "/itineraries/:id/stays",
             get(get_itinerary_stays).post(post_itinerary_stay),

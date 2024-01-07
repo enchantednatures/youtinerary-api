@@ -1,6 +1,8 @@
 mod auth;
 mod db;
 mod models;
+mod features;
+pub mod error_handling;
 use axum::{routing::get, Router};
 pub use models::*;
 use serde::{Deserialize, Serialize};

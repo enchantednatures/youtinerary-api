@@ -10,15 +10,16 @@ opt-level = 3
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.8.4", features = ["serde"] }
 serde = { version = "1.0.188", features = ["derive"] }
-shuttle-axum = "0.34.0"
-shuttle-runtime = "0.34.0"
-shuttle-shared-db = { version = "0.34.0", features = ["postgres"] }
-sqlx = { version = "0.7.1", features = ["runtime-tokio-native-tls", "postgres","postgres",  "chrono", "uuid" ] }
+shuttle-axum = "0.35.2"
+shuttle-runtime = "0.35.2"
+shuttle-shared-db = { version = "0.35.2", features = ["postgres"] }
+sqlx = { version = "0.7.1", features = ["runtime-tokio-native-tls", "postgres",  "chrono", "uuid" ] }
 tokio = "1.28.2"
 tracing = "0.1.40"
 async-trait = "0.1.51"
 anyhow = "1"
+hyper = { version = "0.14", features = ["server"] }
 
 [dependencies.axum]
-version = "0.6.20"
+version = "0.6"
 features = ["headers", "json", "multipart", "tracing"]
