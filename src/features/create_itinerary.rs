@@ -17,7 +17,7 @@ pub async fn create_itinerary(
     Path(user_id): Path<usize>,
     Json(create_itinerary): Json<CreateItineraryRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let created_id = db
+    let itinerary_id = db
         .create_itinerary((user_id, create_itinerary).into())
         .await?;
     Ok((
@@ -57,7 +57,7 @@ impl CreateItineraryRespository for PgPool {
             VALUES ($1, $2)
             RETURNING itinerary_id
             "#,
-            create_itinerary.user_id,
+            create_itinerary.user_id as i32,
             create_itinerary.name,
         )
         .fetch_one(self)

@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use anyhow::Result;
 
 use axum::response::{IntoResponse, Redirect, Response};
@@ -33,6 +35,12 @@ impl IntoResponse for AuthRedirect {
         Redirect::temporary("/authorize").into_response()
     }
 }
+
+impl From<ParseIntError> for AuthRedirect {
+    fn from(_: ParseIntError) -> Self {
+        AuthRedirect
+    }
+}
 #[async_trait]
 impl<S> FromRequestParts<S> for User
 where
@@ -54,6 +62,8 @@ where
             })?;
         let session_cookie = cookies.get(COOKIE_NAME).ok_or(AuthRedirect)?;
 
-        Ok(User { id: 0 })
+        Ok(User {
+            id: session_cookie.parse()?,
+        })
     }
 }

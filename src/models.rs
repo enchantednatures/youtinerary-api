@@ -11,16 +11,6 @@ pub struct User {
     pub email: String,
 }
 
-#[derive(FromRow, Serialize, Deserialize)]
-pub struct Itinerary {
-    pub id: i32,
-    pub name: String,
-    pub user_id: i32,
-    pub created_at: DateTime<Utc>,
-    pub start_date: NaiveDate,
-    pub end_date: NaiveDate,
-}
-
 #[derive(sqlx::Type, Serialize, Deserialize)]
 #[sqlx(type_name = "itinerary_status", rename_all = "lowercase")]
 pub enum ItineraryStatus {
