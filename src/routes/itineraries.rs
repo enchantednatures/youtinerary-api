@@ -2,7 +2,6 @@ use axum::extract::{Path, State};
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use axum::routing::post;
 use axum::{routing::get, Router};
 use serde::{Deserialize, Serialize};
@@ -10,6 +9,7 @@ use sqlx::{types::chrono::NaiveDate, PgPool};
 
 use crate::AppState;
 use crate::features::create_flight;
+use crate::features::create_itinerary;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateItineraryRequest {
@@ -34,14 +34,6 @@ pub struct DeleteItineraryRequest {
 #[tracing::instrument(name = "Get Itinerary", skip(db))]
 pub async fn get_itinerary(State(db): State<PgPool>, Path(id): Path<i32>) -> impl IntoResponse {
     (StatusCode::OK, "get_itinerary")
-}
-
-#[tracing::instrument(name = "Create Itinerary", skip(db, create_itinerary))]
-pub async fn create_itinerary(
-    State(db): State<PgPool>,
-    Json(create_itinerary): Json<CreateItineraryRequest>,
-) -> impl IntoResponse {
-    (StatusCode::CREATED, Json(create_itinerary))
 }
 
 #[tracing::instrument(name = "Put Itinerary", skip(db))]
