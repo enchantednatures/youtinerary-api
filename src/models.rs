@@ -4,13 +4,6 @@ use sqlx::{
     FromRow,
 };
 
-#[derive(FromRow, Serialize, Deserialize)]
-pub struct User {
-    pub id: i32,
-    pub name: String,
-    pub email: String,
-}
-
 #[derive(sqlx::Type, Serialize, Deserialize)]
 #[sqlx(type_name = "itinerary_status", rename_all = "lowercase")]
 pub enum ItineraryStatus {

@@ -7,9 +7,9 @@ use axum::{routing::get, Router};
 use serde::{Deserialize, Serialize};
 use sqlx::{types::chrono::NaiveDate, PgPool};
 
-use crate::AppState;
-use crate::features::{create_flight, get_itineraries};
 use crate::features::create_itinerary;
+use crate::features::{create_flight, get_itineraries};
+use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateItineraryRequest {

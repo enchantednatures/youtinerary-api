@@ -8,18 +8,26 @@ opt-level = 3
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = { version = "0.8.4", features = ["serde"] }
-serde = { version = "1.0.188", features = ["derive"] }
-shuttle-axum = "0.35.2"
-shuttle-runtime = "0.35.2"
-shuttle-shared-db = { version = "0.35.2", features = ["postgres"] }
-sqlx = { version = "0.7.1", features = ["runtime-tokio-native-tls", "postgres",  "chrono", "uuid" ] }
-tokio = "1.28.2"
-tracing = "0.1.40"
-async-trait = "0.1.51"
+chrono-tz = { version = "0.8", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres",  "chrono", "uuid" ] }
+tokio = {version="1.35", features = ["rt-multi-thread"]}
+tracing = "0.1"
+tracing-bunyan-formatter = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
-hyper = { version = "0.14", features = ["server"] }
+hyper = { version = "1", features = ["server"] }
+reqwest = { version = "0.11", features = ["json"] }
+axum-extra = { version="0.9",  features = ["typed-header"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["fs", "trace"] }
+headers = "0.4"
+oauth2 = "4.4"
+async-session = "3.0"
+redis = { version = "0.24", features = ["tokio-comp"] }
+
 
 [dependencies.axum]
-version = "0.6"
-features = ["headers", "json", "multipart", "tracing"]
+version = "0.7"
+features = [ "json", "multipart", "tracing", "ws"]

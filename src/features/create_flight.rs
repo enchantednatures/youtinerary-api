@@ -14,7 +14,7 @@ use crate::error_handling::AppError;
 #[tracing::instrument(name = "Create Flight", skip(db))]
 pub async fn create_flight(
     State(db): State<PgPool>,
-    Path(itinerary_id): Path<usize>,
+    Path(itinerary_id): Path<i32>,
     Json(create_flight): Json<CreateFlightRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let created_id = db
@@ -32,7 +32,7 @@ pub struct CreateFlightRequest {
     pub(crate) notes: String,
 }
 
-impl Into<InsertFlight> for (usize, CreateFlightRequest) {
+impl Into<InsertFlight> for (i32, CreateFlightRequest) {
     fn into(self) -> InsertFlight {
         InsertFlight {
             itinerary_id: self.0,
@@ -46,7 +46,7 @@ impl Into<InsertFlight> for (usize, CreateFlightRequest) {
 }
 
 struct InsertFlight {
-    itinerary_id: usize,
+    itinerary_id: i32,
     airline: String,
     confirmation_code: String,
     departure_time: DateTime<Utc>,
@@ -55,11 +55,11 @@ struct InsertFlight {
 }
 
 trait CreateFlightRespository {
-    async fn create_flight(&self, create_flight: InsertFlight) -> Result<usize>;
+    async fn create_flight(&self, create_flight: InsertFlight) -> Result<i32>;
 }
 
 impl CreateFlightRespository for PgPool {
-    async fn create_flight(&self, create_flight: InsertFlight) -> Result<usize> {
+    async fn create_flight(&self, create_flight: InsertFlight) -> Result<i32> {
         let created_id = sqlx::query!(
             r#"
             INSERT INTO flights (airline, confirmation_code, departure_time, arrival_time, notes)
@@ -75,6 +75,6 @@ impl CreateFlightRespository for PgPool {
         .fetch_one(self)
         .await?;
 
-        Ok(created_id.id as usize)
+        Ok(created_id.id as i32)
     }
 }

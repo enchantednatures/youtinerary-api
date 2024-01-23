@@ -9,16 +9,17 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
+use crate::auth::User;
 use crate::error_handling::AppError;
 
 #[tracing::instrument(name = "Create Itinerary", skip(db))]
 pub async fn create_itinerary(
     State(db): State<PgPool>,
-    Path(user_id): Path<usize>,
+    user: User,
     Json(create_itinerary): Json<CreateItineraryRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let itinerary_id = db
-        .create_itinerary((user_id, create_itinerary).into())
+        .create_itinerary((user.id, create_itinerary).into())
         .await?;
     Ok((
         StatusCode::CREATED,
@@ -31,26 +32,26 @@ pub struct CreateItineraryRequest {
     name: String,
 }
 
-impl Into<InsertItinerary> for (usize, CreateItineraryRequest) {
-    fn into(self) -> InsertItinerary {
+impl From<(i32, CreateItineraryRequest)> for InsertItinerary {
+    fn from(val: (i32, CreateItineraryRequest)) -> Self {
         InsertItinerary {
-            user_id: self.0,
-            name: self.1.name,
+            user_id: val.0,
+            name: val.1.name,
         }
     }
 }
 
 struct InsertItinerary {
-    user_id: usize,
+    user_id: i32,
     name: String,
 }
 
 trait CreateItineraryRespository {
-    async fn create_itinerary(&self, create_itinerary: InsertItinerary) -> Result<usize>;
+    async fn create_itinerary(&self, create_itinerary: InsertItinerary) -> Result<i32>;
 }
 
 impl CreateItineraryRespository for PgPool {
-    async fn create_itinerary(&self, create_itinerary: InsertItinerary) -> Result<usize> {
+    async fn create_itinerary(&self, create_itinerary: InsertItinerary) -> Result<i32> {
         let inserted = sqlx::query!(
             r#"
             INSERT INTO itineraries (user_id, name)
@@ -63,6 +64,6 @@ impl CreateItineraryRespository for PgPool {
         .fetch_one(self)
         .await?;
 
-        Ok(inserted.itinerary_id as usize)
+        Ok(inserted.itinerary_id as i32)
     }
 }
