@@ -62,9 +62,9 @@ impl CreateFlightRespository for PgPool {
     async fn create_flight(&self, create_flight: InsertFlight) -> Result<i32> {
         let created_id = sqlx::query!(
             r#"
-            INSERT INTO flights (airline, confirmation_code, departure_time, arrival_time, notes)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id
+            insert into flights (airline, confirmation_code, departure_time, arrival_time, notes)
+            values ($1, $2, $3, $4, $5)
+            returning id
             "#,
             create_flight.airline,
             create_flight.confirmation_code,

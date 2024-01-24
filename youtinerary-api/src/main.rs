@@ -2,7 +2,6 @@ pub mod error_handling;
 mod features;
 mod health_check;
 mod models;
-mod routes;
 use std::net::SocketAddr;
 
 use anyhow::Context;
@@ -12,7 +11,6 @@ use axum::{routing::get, Router};
 pub use health_check::*;
 pub use models::*;
 use oauth2::basic::BasicClient;
-pub use routes::itineraries_router;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -24,6 +22,8 @@ mod configuration;
 use configuration::Settings;
 use youtinerary_auth::default_auth;
 use youtinerary_auth::login_authorized;
+
+use self::features::itineraries_router;
 
 
 #[derive(Clone)]
@@ -97,6 +97,8 @@ async fn main() -> Result<()> {
     .await
     .context("failed to bind TcpListener")
     .unwrap();
+
+    // https://auth.enchantednatures.com/if/flow/default-provider-authorization-implicit-consent/?response_type=code&client_id=MJMA1gc26LxdVxJQD3hRiHoEIyoAqQLHwusvTuom&state=qcaPt681CLwRgyfwybCvWA&redirect_uri=http%3A%2F%2Flocalhost%3A6969%2Fauthorized&scope=identify+email+openid
 
     let router = Router::new()
         .route("/", get(health_check))

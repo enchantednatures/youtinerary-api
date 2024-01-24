@@ -172,7 +172,7 @@ pub async fn login_authorized(
     let mut headers = HeaderMap::new();
     headers.insert(SET_COOKIE, cookie.parse().unwrap());
 
-    (headers, Redirect::to("/swagger-ui"))
+    (headers, Redirect::to("/"))
 }
 
 #[tracing::instrument(name = "Default Auth", skip(client))]
@@ -191,7 +191,8 @@ impl TryFrom<AuthSettings> for BasicClient {
     type Error = anyhow::Error;
 
     fn try_from(auth_settings: AuthSettings) -> Result<Self> {
-        Ok(BasicClient::new(
+        Ok(
+            BasicClient::new(
             ClientId::new(auth_settings.client_id),
             Some(ClientSecret::new(auth_settings.client_secret)),
             AuthUrl::new(auth_settings.auth_url)
@@ -206,6 +207,7 @@ impl TryFrom<AuthSettings> for BasicClient {
         .set_redirect_uri(
             RedirectUrl::new(auth_settings.redirect_url)
                 .context("failed to create new redirection URL")?,
-        ))
+        )
+        )
     }
 }

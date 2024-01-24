@@ -24,7 +24,6 @@ impl From<Itinerary> for ItineraryViewModel {
             name: value.name,
         }
     }
-    // add code here
 }
 struct ErrorMessage {
     message: String,
