@@ -112,7 +112,7 @@ pub struct AuthentikUser {
 pub struct AuthRedirect;
 
 impl From<anyhow::Error> for AuthRedirect {
-    fn from(value: anyhow::Error) -> Self {
+    fn from(_value: anyhow::Error) -> Self {
         Self {}
     }
 }
@@ -148,8 +148,7 @@ where
 
         let session = store
             .get_session(session_cookie)
-            .await
-            .unwrap()
+            .await?
             .ok_or(AuthRedirect)?;
 
         let user = session.get::<AuthentikUser>("user").ok_or(AuthRedirect)?;
