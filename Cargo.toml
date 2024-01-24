@@ -1,12 +1,14 @@
-[package]
-name = "youtinerary-api"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+
+members = [ "youtinerary-api","youtinerary-auth"]
+
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
-[dependencies]
+
+[workspace.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.8", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -26,8 +28,9 @@ headers = "0.4"
 oauth2 = "4.4"
 async-session = "3.0"
 redis = { version = "0.24", features = ["tokio-comp"] }
+config = { version = "0.13", default-features = false, features = ["yaml"] }
 
 
-[dependencies.axum]
+[workspace.dependencies.axum]
 version = "0.7"
 features = [ "json", "multipart", "tracing", "ws"]

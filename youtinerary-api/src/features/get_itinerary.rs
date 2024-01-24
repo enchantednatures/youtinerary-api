@@ -8,8 +8,8 @@ use axum::response::IntoResponse;
 use serde::Serialize;
 use serde_json::json;
 use sqlx::{Error, PgPool};
+use youtinerary_auth::User;
 
-use crate::auth::User;
 use crate::error_handling::AppError;
 
 #[derive(Serialize)]

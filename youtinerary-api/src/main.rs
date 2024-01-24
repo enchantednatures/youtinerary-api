@@ -1,15 +1,17 @@
-mod auth;
 pub mod error_handling;
 mod features;
 mod health_check;
 mod models;
 mod routes;
+use std::net::SocketAddr;
+
 use anyhow::Context;
 use anyhow::Result;
 use axum::extract::FromRef;
 use axum::{routing::get, Router};
 pub use health_check::*;
 pub use models::*;
+use oauth2::basic::BasicClient;
 pub use routes::itineraries_router;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
@@ -17,15 +19,43 @@ use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{EnvFilter, Registry};
 
+mod configuration;
+
+use configuration::Settings;
+use youtinerary_auth::default_auth;
+use youtinerary_auth::login_authorized;
+
+
 #[derive(Clone)]
 pub struct AppState {
     pool: PgPool,
     redis: redis::Client,
+    oauth_client: BasicClient,
+    reqwest_client: reqwest::Client,
 }
+
+impl FromRef<AppState> for redis::Client {
+    fn from_ref(state: &AppState) -> Self {
+        state.redis.clone()
+    }
+}
+
+impl FromRef<AppState> for reqwest::Client {
+    fn from_ref(state: &AppState) -> Self {
+        state.reqwest_client.clone()
+    }
+}
+
 
 impl FromRef<AppState> for PgPool {
     fn from_ref(state: &AppState) -> Self {
         state.pool.clone()
+    }
+}
+
+impl FromRef<AppState> for BasicClient {
+    fn from_ref(state: &AppState) -> Self {
+        state.oauth_client.clone()
     }
 }
 
@@ -46,20 +76,33 @@ async fn main() -> Result<()> {
         .with(formatting_layer);
 
     tracing::subscriber::set_global_default(subscriber).unwrap();
+
+    let settings = Settings::load_config().unwrap();
+
     let pool: PgPool = connect_database(&std::env::var("DATABASE_URL")?).await;
     let redis = redis::Client::open(std::env::var("REDIS_URL")?).unwrap();
     sqlx::migrate!().run(&pool).await?;
 
-    let state = AppState { pool, redis };
+    let state = AppState {
+        pool,
+        redis,
+        oauth_client: settings.auth_settings.try_into()?,
+        reqwest_client: reqwest::Client::new(),
+    };
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
-        .await
-        .context("failed to bind TcpListener")
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(SocketAddr::from((
+        settings.app_settings.addr,
+        settings.app_settings.port,
+    )))
+    .await
+    .context("failed to bind TcpListener")
+    .unwrap();
 
     let router = Router::new()
         .route("/", get(health_check))
         .route("/health_check", get(health_check))
+        .route("/authorize", get(default_auth))
+        .route("/authorized", get(login_authorized))
         .nest("/api/v0", itineraries_router())
         // .route("", get(retrieve))
         .with_state(state);

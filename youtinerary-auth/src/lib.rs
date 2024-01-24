@@ -1,15 +1,14 @@
 use anyhow::{Context, Result};
 
 use async_session::Session;
-use axum_extra::TypedHeader;
 use axum_extra::typed_header::TypedHeaderRejectionReason;
+use axum_extra::TypedHeader;
 use hyper::HeaderMap;
 use oauth2::{
     basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl,
 };
 use oauth2::{IntrospectionUrl, RevocationUrl};
 
-// use crate::configuration::AuthSettings;
 use axum::extract::{Query, State};
 
 use axum::http::header::SET_COOKIE;
@@ -22,25 +21,26 @@ use axum::{
     extract::{FromRef, FromRequestParts},
     RequestPartsExt,
 };
-use serde::Deserialize;
 
 use oauth2::{reqwest::async_http_client, AuthorizationCode, TokenResponse};
-use serde::Serialize;
 
 use redis::AsyncCommands;
 
-use crate::AppState;
-
+use serde::{Deserialize, Serialize};
 static COOKIE_NAME: &str = "SESSION";
 
-
-impl FromRef<AppState> for redis::Client {
-    fn from_ref(state: &AppState) -> Self {
-        state.redis.clone()
-    }
+#[derive(Debug, Deserialize)]
+pub struct AuthSettings {
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirect_url: String,
+    pub token_url: String,
+    pub auth_url: String,
+    pub introspection_url: String,
+    pub revocation_url: String,
 }
 
-pub trait SessionManager {
+trait SessionManager {
     async fn get_session<'a>(&self, session_id: &'a str) -> Result<Option<Session>>;
     async fn set_session(&self, session: &Session) -> Result<String>;
 }
@@ -131,6 +131,7 @@ pub async fn protected(user: User) -> impl IntoResponse {
 pub async fn login_authorized(
     Query(query): Query<AuthRequest>,
     State(store): State<redis::Client>,
+    State(client): State<reqwest::Client>,
     State(oauth_client): State<BasicClient>,
 ) -> impl IntoResponse {
     let AuthRequest {
@@ -145,10 +146,10 @@ pub async fn login_authorized(
         .unwrap();
 
     let access_token_secret = token.access_token().secret();
-    let client = reqwest::Client::new();
+    let url = oauth_client.introspection_url().unwrap().url().as_str();
 
     let user_data: User = client
-        .get(oauth_client.introspection_url().unwrap().url().as_str())
+        .get(url)
         .bearer_auth(access_token_secret)
         .send()
         .await
@@ -207,34 +208,4 @@ impl TryFrom<AuthSettings> for BasicClient {
                 .context("failed to create new redirection URL")?,
         ))
     }
-}
-
-pub fn create_oauth_client(auth_settings: AuthSettings) -> Result<BasicClient> {
-    Ok(BasicClient::new(
-        ClientId::new(auth_settings.client_id),
-        Some(ClientSecret::new(auth_settings.client_secret)),
-        AuthUrl::new(auth_settings.auth_url)
-            .context("failed to create new authorization server URL")?,
-        Some(
-            TokenUrl::new(auth_settings.token_url)
-                .context("failed to create new token endpoint URL")?,
-        ),
-    )
-    .set_revocation_uri(RevocationUrl::new(auth_settings.revocation_url)?)
-    .set_introspection_uri(IntrospectionUrl::new(auth_settings.introspection_url)?)
-    .set_redirect_uri(
-        RedirectUrl::new(auth_settings.redirect_url)
-            .context("failed to create new redirection URL")?,
-    ))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AuthSettings {
-    pub(crate) client_id: String,
-    pub(crate) client_secret: String,
-    pub(crate) redirect_url: String,
-    pub(crate) token_url: String,
-    pub(crate) auth_url: String,
-    pub(crate) introspection_url: String,
-    pub(crate) revocation_url: String,
 }

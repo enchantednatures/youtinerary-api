@@ -1,15 +1,14 @@
-use axum::extract::{Path, State};
+use axum::extract::State;
 
 use anyhow::Result;
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use youtinerary_auth::User;
 
-use crate::auth::User;
 use crate::error_handling::AppError;
 
 #[tracing::instrument(name = "Create Itinerary", skip(db))]

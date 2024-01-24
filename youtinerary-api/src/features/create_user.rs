@@ -8,7 +8,6 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
-use crate::auth::User;
 use crate::error_handling::AppError;
 
 #[tracing::instrument(name = "Create User", skip(db))]
