@@ -4,22 +4,7 @@ use axum::extract::{FromRef, FromRequestParts};
 use sqlx::PgPool;
 use youtinerary_auth::{AuthRedirect, AuthentikUser};
 
-use async_session::Session;
-use axum::extract::{Query, State};
-use axum_extra::typed_header::TypedHeaderRejectionReason;
-use axum_extra::TypedHeader;
-
-use axum::response::{IntoResponse, Redirect, Response};
-
-use axum::http::header;
 use axum::http::request::Parts;
-use axum::RequestPartsExt;
-
-use redis::AsyncCommands;
-
-use serde::{Deserialize, Serialize};
-use tracing::field::display;
-use tracing::Span;
 
 use crate::models::User;
 
