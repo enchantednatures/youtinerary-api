@@ -10,41 +10,9 @@ create table users
 (
     user_id serial not null
     constraint users_pk primary key,
-    name varchar(255) not null,
+    email varchar(255) not null,
     created_at timestamp default now() not null,
     updated_at timestamp default now() not null
-);
-
-create table user_email
-(
-    user_id integer not null
-    constraint user_email_users_id_fk
-    references users
-    on update cascade
-    on delete cascade,
-    email varchar(255) not null
-    constraint user_email_email_unique
-    unique
-);
-
-create table user_password
-(
-    user_id integer not null
-    constraint user_password_users_id_fk
-    references users
-    on update cascade
-    on delete cascade,
-    password varchar(255) not null
-);
-
-create table user_session (
-    user_id integer not null
-    constraint user_session_users_id_fk
-    references users
-    on update cascade
-    on delete cascade,
-    session_key varchar(255) not null,
-    expiry timestamp default now() + interval '20 minutes' not null
 );
 
 

@@ -8,8 +8,8 @@ use axum::Json;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use youtinerary_auth::User;
 
+use crate::User;
 use crate::error_handling::AppError;
 
 #[derive(Serialize, Deserialize)]

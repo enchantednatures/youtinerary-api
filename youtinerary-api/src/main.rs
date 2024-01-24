@@ -2,6 +2,7 @@ pub mod error_handling;
 mod features;
 mod health_check;
 mod models;
+mod middlewares;
 use std::net::SocketAddr;
 
 use anyhow::Context;
@@ -20,11 +21,11 @@ use tracing_subscriber::{EnvFilter, Registry};
 mod configuration;
 
 use configuration::Settings;
-use youtinerary_auth::default_auth;
+use youtinerary_auth::authorize;
 use youtinerary_auth::login_authorized;
+use youtinerary_auth::protected;
 
 use self::features::itineraries_router;
-
 
 #[derive(Clone)]
 pub struct AppState {
@@ -33,6 +34,9 @@ pub struct AppState {
     oauth_client: BasicClient,
     reqwest_client: reqwest::Client,
 }
+
+
+
 
 impl FromRef<AppState> for redis::Client {
     fn from_ref(state: &AppState) -> Self {
@@ -45,7 +49,6 @@ impl FromRef<AppState> for reqwest::Client {
         state.reqwest_client.clone()
     }
 }
-
 
 impl FromRef<AppState> for PgPool {
     fn from_ref(state: &AppState) -> Self {
@@ -103,7 +106,8 @@ async fn main() -> Result<()> {
     let router = Router::new()
         .route("/", get(health_check))
         .route("/health_check", get(health_check))
-        .route("/authorize", get(default_auth))
+        .route("/protected", get(protected))
+        .route("/authorize", get(authorize))
         .route("/authorized", get(login_authorized))
         .nest("/api/v0", itineraries_router())
         // .route("", get(retrieve))

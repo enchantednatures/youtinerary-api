@@ -1,15 +1,19 @@
+mod error;
+
 use anyhow::{Context, Result};
+use error::AuthError;
 
 use async_session::Session;
+use axum::extract::{Query, State};
 use axum_extra::typed_header::TypedHeaderRejectionReason;
 use axum_extra::TypedHeader;
 use hyper::HeaderMap;
+use oauth2::IntrospectionUrl;
 use oauth2::{
-    basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl,
+    basic::BasicClient, reqwest::async_http_client, AuthUrl, AuthorizationCode, ClientId,
+    ClientSecret, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RevocationUrl,
+    Scope, TokenResponse, TokenUrl,
 };
-use oauth2::{IntrospectionUrl, RevocationUrl};
-
-use axum::extract::{Query, State};
 
 use axum::http::header::SET_COOKIE;
 use axum::response::{IntoResponse, Redirect, Response};
@@ -22,12 +26,19 @@ use axum::{
     RequestPartsExt,
 };
 
-use oauth2::{reqwest::async_http_client, AuthorizationCode, TokenResponse};
-
 use redis::AsyncCommands;
 
 use serde::{Deserialize, Serialize};
+use tracing::field::display;
+use tracing::Span;
 static COOKIE_NAME: &str = "SESSION";
+
+// #[derive(Clone)]
+// pub struct AuthState {
+//     redis: redis::Client,
+//     oauth_client: BasicClient,
+//     reqwest_client: reqwest::Client,
+// }
 
 #[derive(Debug, Deserialize)]
 pub struct AuthSettings {
@@ -40,9 +51,17 @@ pub struct AuthSettings {
     pub revocation_url: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct Oath2State {
+    pkce_code_verifier_secret: String,
+    return_url: String,
+}
+
 trait SessionManager {
     async fn get_session<'a>(&self, session_id: &'a str) -> Result<Option<Session>>;
     async fn set_session(&self, session: &Session) -> Result<String>;
+    async fn set_verifier(&self, csrf: &CsrfToken, state: &Oath2State) -> Result<()>;
+    async fn get_verifier(&self, csrf: &CsrfToken) -> Result<Oath2State>;
 }
 
 impl SessionManager for redis::Client {
@@ -61,6 +80,21 @@ impl SessionManager for redis::Client {
         con.expire(session.id(), 300).await?;
         Ok(session.id().to_string())
     }
+
+    async fn set_verifier(&self, csrf: &CsrfToken, state: &Oath2State) -> Result<()> {
+        let mut con = self.get_async_connection().await?;
+        con.set(csrf.secret(), serde_json::to_string(state)?)
+            .await?;
+        con.expire(csrf.secret(), 300).await?;
+        Ok(())
+    }
+
+    async fn get_verifier(&self, csrf: &CsrfToken) -> Result<Oath2State> {
+        let mut con = self.get_async_connection().await?;
+        let state: String = con.get_del(csrf.secret()).await?;
+        let state: Oath2State = serde_json::from_str(&state)?;
+        Ok(state)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,13 +104,18 @@ pub struct AuthRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct User {
-    pub id: i32,
+pub struct AuthentikUser {
     pub email: String,
     pub sub: String,
 }
 
 pub struct AuthRedirect;
+
+impl From<anyhow::Error> for AuthRedirect {
+    fn from(value: anyhow::Error) -> Self {
+        Self {}
+    }
+}
 
 impl IntoResponse for AuthRedirect {
     fn into_response(self) -> Response {
@@ -84,7 +123,7 @@ impl IntoResponse for AuthRedirect {
     }
 }
 #[async_trait]
-impl<S> FromRequestParts<S> for User
+impl<S> FromRequestParts<S> for AuthentikUser
 where
     redis::Client: FromRef<S>,
     S: Send + Sync,
@@ -113,14 +152,14 @@ where
             .unwrap()
             .ok_or(AuthRedirect)?;
 
-        let user = session.get::<User>("user").ok_or(AuthRedirect)?;
+        let user = session.get::<AuthentikUser>("user").ok_or(AuthRedirect)?;
 
         Ok(user)
     }
 }
 
 #[tracing::instrument(name = "Protected area")]
-pub async fn protected(user: User) -> impl IntoResponse {
+pub async fn protected(user: AuthentikUser) -> impl IntoResponse {
     format!(
         "Welcome to the protected area :)\nHere's your info:\n{:?}",
         user
@@ -133,30 +172,54 @@ pub async fn login_authorized(
     State(store): State<redis::Client>,
     State(client): State<reqwest::Client>,
     State(oauth_client): State<BasicClient>,
-) -> impl IntoResponse {
-    let AuthRequest {
-        code,
-        state: _state,
-    } = query;
+) -> Result<impl IntoResponse, AuthError> {
+    let AuthRequest { code, state } = query;
 
-    let token = oauth_client
-        .exchange_code(AuthorizationCode::new(code))
+    Span::current()
+        .record("code", &display(&code))
+        .record("state", &display(&state));
+
+    let state = CsrfToken::new(state);
+    let code = AuthorizationCode::new(code);
+    let Oath2State {
+        pkce_code_verifier_secret,
+        return_url,
+    } = store.get_verifier(&state).await.unwrap();
+
+    let pkce_code_verifier = PkceCodeVerifier::new(pkce_code_verifier_secret);
+
+    let token_response = oauth_client
+        .exchange_code(code)
+        .set_pkce_verifier(pkce_code_verifier)
         .request_async(async_http_client)
         .await
-        .unwrap();
+        .map_err(|err| match err {
+            oauth2::RequestTokenError::ServerResponse(server_response) => {
+                format!("Server Error: {}", server_response)
+            }
+            oauth2::RequestTokenError::Request(request_error) => {
+                format!("Request Error: {}", request_error)
+            }
+            oauth2::RequestTokenError::Parse(s, v) => format!("Parse Error: {} {:?}", s, v),
+            oauth2::RequestTokenError::Other(o) => format!("OAuth: exchange_code failure: {}", o),
+        })?;
 
-    let access_token_secret = token.access_token().secret();
+    let access_token_secret = token_response.access_token().secret();
     let url = oauth_client.introspection_url().unwrap().url().as_str();
 
-    let user_data: User = client
+    let user_data_response = client
         .get(url)
         .bearer_auth(access_token_secret)
         .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+        .await?;
+
+    dbg!(&user_data_response);
+
+    let user_data = user_data_response.text().await?;
+
+    dbg!(&user_data);
+
+    let user_data: AuthentikUser = serde_json::from_str(&user_data)?;
 
     // Create a new session filled with user data
     let mut session = Session::new();
@@ -172,27 +235,38 @@ pub async fn login_authorized(
     let mut headers = HeaderMap::new();
     headers.insert(SET_COOKIE, cookie.parse().unwrap());
 
-    (headers, Redirect::to("/"))
+    Ok((headers, Redirect::to(&return_url)))
 }
 
-#[tracing::instrument(name = "Default Auth", skip(client))]
-pub async fn default_auth(State(client): State<BasicClient>) -> impl IntoResponse {
-    let (auth_url, _csrf_token) = client
+#[tracing::instrument(name = "Authorize", skip(store, oauth_client))]
+pub async fn authorize(
+    State(store): State<redis::Client>,
+    State(oauth_client): State<BasicClient>,
+) -> impl IntoResponse {
+    let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
+    let (auth_url, csrf_token) = oauth_client
         .authorize_url(CsrfToken::new_random)
         .add_scope(Scope::new("identify".to_string()))
         .add_scope(Scope::new("email".to_string()))
         .add_scope(Scope::new("openid".to_string()))
+        .set_pkce_challenge(pkce_code_challenge)
         .url();
 
-    Redirect::to(auth_url.as_ref())
+    let state = Oath2State {
+        pkce_code_verifier_secret: pkce_code_verifier.secret().to_string(),
+        return_url: "/".to_string(),
+    };
+
+    store.set_verifier(&csrf_token, &state).await.unwrap();
+
+    Redirect::to(auth_url.as_str())
 }
 
 impl TryFrom<AuthSettings> for BasicClient {
     type Error = anyhow::Error;
 
     fn try_from(auth_settings: AuthSettings) -> Result<Self> {
-        Ok(
-            BasicClient::new(
+        Ok(BasicClient::new(
             ClientId::new(auth_settings.client_id),
             Some(ClientSecret::new(auth_settings.client_secret)),
             AuthUrl::new(auth_settings.auth_url)
@@ -207,7 +281,6 @@ impl TryFrom<AuthSettings> for BasicClient {
         .set_redirect_uri(
             RedirectUrl::new(auth_settings.redirect_url)
                 .context("failed to create new redirection URL")?,
-        )
-        )
+        ))
     }
 }

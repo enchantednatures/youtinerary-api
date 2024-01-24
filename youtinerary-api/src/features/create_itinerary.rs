@@ -7,8 +7,8 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use youtinerary_auth::User;
 
+use crate::User;
 use crate::error_handling::AppError;
 
 #[tracing::instrument(name = "Create Itinerary", skip(db))]
