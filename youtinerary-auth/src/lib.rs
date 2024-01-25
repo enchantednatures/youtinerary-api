@@ -8,42 +8,43 @@ use axum::extract::{Query, State};
 use axum_extra::typed_header::TypedHeaderRejectionReason;
 use axum_extra::TypedHeader;
 use hyper::HeaderMap;
+use oauth2::basic::BasicClient;
+use oauth2::reqwest::async_http_client;
+use oauth2::AuthUrl;
+use oauth2::AuthorizationCode;
+use oauth2::ClientId;
+use oauth2::CsrfToken;
 use oauth2::IntrospectionUrl;
-use oauth2::{
-    basic::BasicClient, reqwest::async_http_client, AuthUrl, AuthorizationCode, ClientId,
-    ClientSecret, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RevocationUrl,
-    Scope, TokenResponse, TokenUrl,
-};
+use oauth2::PkceCodeChallenge;
+use oauth2::PkceCodeVerifier;
+use oauth2::RedirectUrl;
+use oauth2::RevocationUrl;
+use oauth2::Scope;
+use oauth2::TokenResponse;
+use oauth2::TokenUrl;
 
 use axum::http::header::SET_COOKIE;
-use axum::response::{IntoResponse, Redirect, Response};
+use axum::response::IntoResponse;
+use axum::response::Redirect;
+use axum::response::Response;
 
+use axum::async_trait;
+use axum::extract::FromRef;
+use axum::extract::FromRequestParts;
 use axum::http::header;
 use axum::http::request::Parts;
-use axum::{
-    async_trait,
-    extract::{FromRef, FromRequestParts},
-    RequestPartsExt,
-};
+use axum::RequestPartsExt;
 
 use redis::AsyncCommands;
 
-use serde::{Deserialize, Serialize};
-use tracing::field::display;
-use tracing::Span;
-static COOKIE_NAME: &str = "SESSION";
+use serde::Deserialize;
+use serde::Serialize;
 
-// #[derive(Clone)]
-// pub struct AuthState {
-//     redis: redis::Client,
-//     oauth_client: BasicClient,
-//     reqwest_client: reqwest::Client,
-// }
+static COOKIE_NAME: &str = "SESSION";
 
 #[derive(Debug, Deserialize)]
 pub struct AuthSettings {
     pub client_id: String,
-    pub client_secret: String,
     pub redirect_url: String,
     pub token_url: String,
     pub auth_url: String,
@@ -131,6 +132,7 @@ where
     // If anything goes wrong or no session is found, redirect to the auth page
     type Rejection = AuthRedirect;
 
+    #[tracing::instrument(name = "Get Authentik User from Request", skip(parts, state))]
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let store = redis::Client::from_ref(state);
 
@@ -145,19 +147,24 @@ where
                 _ => panic!("unexpected error getting cookies: {}", e),
             })?;
         let session_cookie = cookies.get(COOKIE_NAME).ok_or(AuthRedirect)?;
+        tracing::info!("Session cookie found, checking session");
 
         let session = store
             .get_session(session_cookie)
             .await?
             .ok_or(AuthRedirect)?;
 
+        tracing::info!("Session matched");
+
         let user = session.get::<AuthentikUser>("user").ok_or(AuthRedirect)?;
+
+        tracing::info!("Got user");
 
         Ok(user)
     }
 }
 
-#[tracing::instrument(name = "Protected area")]
+#[tracing::instrument(name = "Protected area", skip(user))]
 pub async fn protected(user: AuthentikUser) -> impl IntoResponse {
     format!(
         "Welcome to the protected area :)\nHere's your info:\n{:?}",
@@ -165,7 +172,7 @@ pub async fn protected(user: AuthentikUser) -> impl IntoResponse {
     )
 }
 
-#[tracing::instrument(name = "Login authorized", skip(store, oauth_client))]
+#[tracing::instrument(name = "Login authorized", skip(store, client, oauth_client, query))]
 pub async fn login_authorized(
     Query(query): Query<AuthRequest>,
     State(store): State<redis::Client>,
@@ -173,10 +180,6 @@ pub async fn login_authorized(
     State(oauth_client): State<BasicClient>,
 ) -> Result<impl IntoResponse, AuthError> {
     let AuthRequest { code, state } = query;
-
-    Span::current()
-        .record("code", &display(&code))
-        .record("state", &display(&state));
 
     let state = CsrfToken::new(state);
     let code = AuthorizationCode::new(code);
@@ -186,6 +189,8 @@ pub async fn login_authorized(
     } = store.get_verifier(&state).await.unwrap();
 
     let pkce_code_verifier = PkceCodeVerifier::new(pkce_code_verifier_secret);
+
+    tracing::info!("Exchanging code for token");
 
     let token_response = oauth_client
         .exchange_code(code)
@@ -203,28 +208,24 @@ pub async fn login_authorized(
             oauth2::RequestTokenError::Other(o) => format!("OAuth: exchange_code failure: {}", o),
         })?;
 
+    tracing::info!("Token exchange successful");
+
     let access_token_secret = token_response.access_token().secret();
     let url = oauth_client.introspection_url().unwrap().url().as_str();
 
-    let user_data_response = client
+    let user_data: AuthentikUser = client
         .get(url)
         .bearer_auth(access_token_secret)
         .send()
+        .await?
+        .json()
         .await?;
 
-    dbg!(&user_data_response);
-
-    let user_data = user_data_response.text().await?;
-
-    dbg!(&user_data);
-
-    let user_data: AuthentikUser = serde_json::from_str(&user_data)?;
-
-    // Create a new session filled with user data
+    tracing::info!("User data retrieved, creating session");
     let mut session = Session::new();
     session.insert("user", &user_data).unwrap();
 
-    // Store session and get corresponding cookie
+    tracing::info!("Store session and get corresponding cookie");
     let cookie = store.set_session(&session).await.unwrap();
 
     // Build the cookie
@@ -242,6 +243,7 @@ pub async fn authorize(
     State(store): State<redis::Client>,
     State(oauth_client): State<BasicClient>,
 ) -> impl IntoResponse {
+    tracing::info!("Setting up authorization");
     let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
     let (auth_url, csrf_token) = oauth_client
         .authorize_url(CsrfToken::new_random)
@@ -256,8 +258,10 @@ pub async fn authorize(
         return_url: "/".to_string(),
     };
 
+    tracing::info!("Setting verifier");
     store.set_verifier(&csrf_token, &state).await.unwrap();
 
+    tracing::info!("User data retrieved, creating session");
     Redirect::to(auth_url.as_str())
 }
 
@@ -267,7 +271,7 @@ impl TryFrom<AuthSettings> for BasicClient {
     fn try_from(auth_settings: AuthSettings) -> Result<Self> {
         Ok(BasicClient::new(
             ClientId::new(auth_settings.client_id),
-            Some(ClientSecret::new(auth_settings.client_secret)),
+            None,
             AuthUrl::new(auth_settings.auth_url)
                 .context("failed to create new authorization server URL")?,
             Some(
